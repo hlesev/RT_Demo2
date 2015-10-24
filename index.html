@@ -1,0 +1,115 @@
+<html>
+
+  <head>
+     <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+     
+    <script type="text/javascript" src="/libs/js/jquery.min.js"></script>
+    <script type="text/javascript" src="/libs/js/jquery-ui-latest.js"></script>
+
+    <script type="text/javascript" src="/libs/js/jquery.layout-1.4.4.js"></script>
+    <link type="text/css" rel="stylesheet" href="/libs/css/layout-default-latest.css" />
+
+    <script type="text/javascript" src="http://netdna.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
+    <link href="http://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.3.0/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+
+    <link href="/libs/css/app-custom-styles.css" rel="stylesheet" type="text/css">
+    
+    <style type="text/css">
+      html, body {
+        background:	#666;
+        width:		100%;
+        height:		100%;					
+        padding:	0;
+        margin:		0;
+        overflow:	auto; /* when page gets too small */
+      }
+      #AppContainer {
+        background:	#999;
+        height:		100%;
+        margin:		0 auto;
+        width:		100%;
+        /*max-width:	900px;*/
+        min-width:	700px;
+        _width:		700px; /* min-width for IE6 */
+      }
+      .pane {
+        display:	none; /* will appear when layout inits */
+      }
+      
+      .visViewport {
+        background:	#EEE; /*#983030*/
+        width:		100%;
+        height:		94%;					
+        padding:	0;
+        margin:		0;
+        overflow:	hidden; /* when page gets too small */
+      }
+      
+      .ui-layout-pane {
+        background:	#DDD;
+      }
+      
+      .btn-toolbar {
+        margin: 0px 0px 10px -6px;
+      }
+      
+    </style>
+    
+    <script src="/libs/js/signals.min.js"></script>
+    <script src="/libs/js/jquery.ba-resize.min.js"></script>
+    <script src="/libs/js/three.min.js"></script>
+		<script src="/libs/js/OrbitControls.js"></script>
+    
+    <script type="text/javascript" src="SceneViewerRT.js"></script>
+    <script type="text/javascript" src="SceneViewerGL.js"></script>
+    <script type="text/javascript" src="app.js"></script>
+  </head>
+  
+  <body>
+
+    <div id="AppContainer">
+      
+      <div id="RTPanel" class="pane ui-layout-center">
+        
+ 
+        <div class="btn-toolbar" role="toolbar">
+          <div class="btn-group">
+            <a id="BtnRTToggleFS" type="button" class="btn btn-default"><i class="fa fa-expand fa-fw"></i></a>
+          </div>
+          <div class="btn-group">
+            <a id="BtnRTStart" type="button" class="btn btn-default"><i class="fa fa-fw fa-play"></i></a>
+            <a id="BtnRTStop" type="button" class="btn btn-default"><i class="fa fa-fw fa-stop"></i></a>
+            <a id="BtnToggleDebug" type="button" class="btn btn-default"><i class="fa fa-bug fa-fw"></i></a>
+          </div>
+        </div> <!-- toolbar -->
+
+        
+        <div id="ViewportRT" class="visViewport">
+        </div>
+        
+      </div> <!-- RTPanel -->
+      
+      <div id="GLPanel" class="pane ui-layout-east">
+        
+
+        <div class="btn-toolbar" role="toolbar">
+          <div class="btn-group">
+            <a id="BtnGLToggleFS" type="button" class="btn btn-default"><i class="fa fa-expand fa-fw"></i></a>
+          </div>
+          <div class="btn-group">
+            <a type="button" class="btn btn-default"><i class="fa fa-fw fa-play"></i></a>
+            <a id="BtnToggleWireframe" type="button" class="btn btn-default"><i class="fa fa-bug fa-fw"></i></a>
+          </div>
+        </div> <!-- toolbar -->
+        
+        <div id="ViewportGL" class="visViewport">
+        </div>
+        
+      </div> <!-- GLPanel -->
+      
+      <div class="pane ui-layout-south">Console</div>
+    </div>
+    
+  </body>
+
+</html>
