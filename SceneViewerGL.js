@@ -107,6 +107,9 @@ var SceneViewerGL = (function () {
 			var vertsID = 0;
 			var matID = 0;
 			
+			var rootObj = new THREE.Object3D();
+			var rootObjEdges = new THREE.Object3D();
+			
 			var geom = new THREE.Geometry(); 
 			//var objSceneEdges;
 			var mats = []; 
@@ -142,6 +145,29 @@ var SceneViewerGL = (function () {
 					geom.faces.push( new THREE.Face3( vertsID++, vertsID++, vertsID++, null, null, matID-1 ) );
 
 				}
+				else if( 's'==elements[0] )
+				{
+					elements.shift();
+					
+					var center = new THREE.Vector3(elements[elID++],elements[elID++],elements[elID++]);
+					center.multiplyScalar( that.SCENE_SCALE );
+					
+					var radius = that.SCENE_SCALE  * elements[elID++];
+					
+					var sphere = new THREE.Mesh(
+										new THREE.SphereGeometry( radius, 20, 20), 
+										mats[matID-1]
+										);
+										
+					var m = new THREE.Matrix4();
+					m.setPosition(center);
+					
+					sphere.applyMatrix(m);
+
+					rootObj.add( sphere );
+					
+					rootObjEdges.add( new THREE.EdgesHelper( sphere, 0x00ff00 ) );
+				}
 				else if( 'm'==elements[0] )
 				{
 					elements.shift();
@@ -154,9 +180,32 @@ var SceneViewerGL = (function () {
 						rgbDiff = (rgbDiff << 8) + Math.floor(elements[elID++] * 255);
 						rgbDiff = (rgbDiff << 8) + Math.floor(elements[elID++] * 255);
 
-						matID = mats.push( new THREE.MeshLambertMaterial( {color:rgbDiff, /*emissive:rgbEmiss,*/ polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 } ) )
+						matID = mats.push( new THREE.MeshLambertMaterial( {color:rgbDiff, /*emissive:rgbEmiss,*/ polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 } ) );
 
 						//currentMaterial = new MatDiffuse( new Color3(elements[elID++], elements[elID++], elements[elID++]) );
+					}
+					else if( 'refr' == matType )
+					{
+						var rgbRefr = Math.floor(elements[elID++] * 255);
+						rgbRefr = (rgbRefr << 8) + Math.floor(elements[elID++] * 255);
+						rgbRefr = (rgbRefr << 8) + Math.floor(elements[elID++] * 255);
+
+						//var opacity = 1.0 - (rgbRefr / 17777215);
+						
+						matID = mats.push( new THREE.MeshLambertMaterial( {transparent: true, opacity: 0.5, color:rgbDiff, /*emissive:rgbEmiss,*/ polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 } ) );
+						
+					}
+					else if( 'refl' == matType )
+					{
+						var rgbRefl = Math.floor(elements[elID++] * 255);
+						rgbRefl = (rgbRefl << 8) + Math.floor(elements[elID++] * 255);
+						rgbRefl = (rgbRefl << 8) + Math.floor(elements[elID++] * 255);
+						
+						
+						var mirrorSphereCamera = new THREE.CubeCamera( 0.1, 5000, 512 );
+						// mirrorCubeCamera.renderTarget.minFilter = THREE.LinearMipMapLinearFilter;
+						that.scene.add( mirrorSphereCamera );
+						matID = mats.push(new THREE.MeshBasicMaterial( { envMap: mirrorSphereCamera.renderTarget } ));
 					}
 					else
 					{
@@ -168,9 +217,13 @@ var SceneViewerGL = (function () {
 			
 			var material = new THREE.MeshFaceMaterial( mats );
 			var meshObject = new THREE.Mesh( geom, material );
-			that.scene.add( meshObject );
+			rootObj.add( meshObject );
 			
-			that.objSceneEdges = new THREE.EdgesHelper( meshObject, 0x00ff00 );
+			that.scene.add( rootObj );
+			
+			rootObjEdges.add( new THREE.EdgesHelper( meshObject, 0x00ff00 ) );
+			
+			that.objSceneEdges = rootObjEdges;
 			that.objSceneEdges.visible = false;
 			that.scene.add( that.objSceneEdges );
 			

@@ -121,7 +121,7 @@ var Triangle = (function () {
     Triangle.prototype.getMaterial = function () {
         return this.material;
     };
-    Triangle.prototype.getNormal = function () {
+    Triangle.prototype.getNormal = function (_wp) {
         return this.normal;
     };
     Triangle.prototype.intersect = function (_ray) {
@@ -152,14 +152,18 @@ var Sphere = (function () {
         this.radius = _radius;
         this.radius2 = _radius * _radius;
         this.material = _material;
+        console.log("sphere created " + this.center.x + " " + this.center.y + " " + this.center.z + " / " + this.radius);
     }
     Sphere.prototype.getMaterial = function () {
         return this.material;
     };
-    Sphere.prototype.getNormal = function () {
-        return new Vector3(0, 0, 1);
+    Sphere.prototype.getNormal = function (_wp) {
+        //console.log( "normal" );
+        var hitNormal = Vector3.minus(_wp, this.center);
+        return Vector3.getNormalized(hitNormal);
     };
     Sphere.prototype.intersect = function (_ray) {
+        /*
         var eo = Vector3.minus(this.center, _ray.origin);
         var v = Vector3.dot(eo, _ray.dir);
         var dist = 0;
@@ -169,9 +173,31 @@ var Sphere = (function () {
                 dist = v - Math.sqrt(disc);
             }
         }
+        //console.log( "intersect" );
+        
         return dist;
+        */
+        var a, b, c;
+        var rayO = Vector3.minus(_ray.origin, this.center);
+        a = _ray.dir.x * _ray.dir.x + _ray.dir.y * _ray.dir.y + _ray.dir.z * _ray.dir.z;
+        b = 2.0 * (_ray.dir.x * rayO.x + _ray.dir.y * rayO.y + _ray.dir.z * rayO.z);
+        c = rayO.x * rayO.x + rayO.y * rayO.y + rayO.z * rayO.z - this.radius2;
+        var disk = b * b - 4 * a * c;
+        if (disk < 0) {
+            return -1;
+        }
+        else {
+            disk = Math.sqrt(disk);
+        }
+        var t0 = (-b - disk) / (2 * a);
+        return t0;
     };
     return Sphere;
+})();
+var HitData = (function () {
+    function HitData() {
+    }
+    return HitData;
 })();
 var Scene = (function () {
     function Scene() {
@@ -190,7 +216,14 @@ var Scene = (function () {
                 _ray.maxT = t;
             }
         }
-        return hitGeom;
+        var hitData = null;
+        if (null != hitGeom) {
+            hitData = new HitData();
+            hitData.hitGeometry = hitGeom;
+            hitData.hitT = _ray.maxT;
+            hitData.hitWP = MathUtils.getPointWC(_ray.origin, _ray.dir, _ray.maxT);
+        }
+        return hitData;
     };
     return Scene;
 })();
@@ -246,10 +279,10 @@ var RayTracer = (function () {
         }
         if (_depth > 10)
             return radiance;
-        var hitGeometry = this.scene.intersect(_ray);
-        if (null != hitGeometry) {
-            var objColor = hitGeometry.getMaterial().getColor();
-            var normal = hitGeometry.getNormal();
+        var hitData = this.scene.intersect(_ray);
+        if (null != hitData) {
+            var objColor = hitData.hitGeometry.getMaterial().getColor();
+            var normal = hitData.hitGeometry.getNormal(hitData.hitWP);
             var nextDir = MathUtils.getDiffDirLocal();
             nextDir = MathUtils.applyTangentFrame(normal, nextDir);
             var nextRay = new Ray(MathUtils.getPointWC(_ray.origin, _ray.dir, _ray.maxT), nextDir);
@@ -368,6 +401,12 @@ var SceneParser = (function () {
                 var v1 = new Vector3(elements[elID++], elements[elID++], elements[elID++]);
                 var v2 = new Vector3(elements[elID++], elements[elID++], elements[elID++]);
                 SceneParser.scene.geometry.push(new Triangle(v0, v1, v2, currentMaterial));
+            }
+            else if ('s' == elements[0]) {
+                elements.shift();
+                var center = new Vector3(+elements[elID++], +elements[elID++], +elements[elID++]);
+                var radius = +elements[elID++];
+                SceneParser.scene.geometry.push(new Sphere(center, radius, currentMaterial));
             }
         }
         SceneParser.tracer.render();
