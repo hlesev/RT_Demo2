@@ -162,6 +162,7 @@ interface Material
 {
 	filterColor: Color3;
 	getColor: () => Color3;
+	getNextDir: ( _inDir : Vector3, _normal : Vector3 ) => Vector3;
 }
 
 class MatDiffuse implements Material
@@ -177,6 +178,80 @@ class MatDiffuse implements Material
 	{
 		return this.filterColor;
 	}
+	
+	getNextDir( _inDir : Vector3, _normal : Vector3 )
+	{
+		var nextDir = MathUtils.getDiffDirLocal();
+		return MathUtils.applyTangentFrame(_normal, nextDir);
+	}
+}
+
+class MatMirror implements Material
+{
+	public filterColor: Color3;
+	
+	constructor( _filterColor : Color3 )
+	{
+		this.filterColor = _filterColor;
+	}
+	
+	getColor()
+	{
+		return this.filterColor;
+	}
+	
+	getNextDir( _inDir : Vector3, _normal : Vector3 )
+	{
+		var normalFF : Vector3 = MathUtils.faceforward(_normal, _inDir);
+
+		var outDir : Vector3 = Vector3.getNormalized(Vector3.minus(_inDir, Vector3.mul(Vector3.dot(normalFF, _inDir)*2.0, normalFF)));
+        
+		return outDir;
+	}
+}
+
+class MatGlass implements Material
+{
+	public filterColor: Color3;
+	public IoR;
+	
+	constructor( _filterColor : Color3, _ior )
+	{
+		this.filterColor = _filterColor;
+		this.IoR = _ior;
+	}
+	
+	getColor()
+	{
+		return this.filterColor;
+	}
+	
+	getNextDir( _inDir : Vector3, _normal : Vector3 )
+	{
+		var normalFF : Vector3 = MathUtils.faceforward(_normal, _inDir);
+		
+		var ior : number = this.IoR;
+
+		if ( Vector3.dot(_normal, _inDir) < 0)
+			ior = 1.0 / this.IoR;
+
+		var thetaView : number = Vector3.dot(_inDir, _normal);
+		var thetaT : number = 1.0 - (ior * ior) * (1.0 - thetaView * thetaView);
+
+		var outDir : Vector3 = new Vector3(0, 0, 0);
+
+		if (thetaT < 0.0) // total internal reflection ? 
+		{
+			outDir = Vector3.getNormalized(Vector3.minus(_inDir, Vector3.mul(Vector3.dot(normalFF, _inDir)*2.0, normalFF)));
+		}
+		else
+			outDir = Vector3.minus(
+					Vector3.mul(ior, _inDir),
+					Vector3.mul(ior * thetaView + Math.sqrt(thetaT), _normal)
+				 );
+			
+		return outDir;
+	}
 }
 
 class MatEmitter implements Material
@@ -191,6 +266,12 @@ class MatEmitter implements Material
 	getColor()
 	{
 		return this.filterColor;
+	}
+	
+	getNextDir( _inDir : Vector3, _normal : Vector3 )
+	{
+		var nextDir = MathUtils.getDiffDirLocal();
+		return MathUtils.applyTangentFrame(_normal, nextDir);
 	}
 }
 
@@ -389,6 +470,14 @@ class MathUtils
 		return Vector3.plus( _pos, Vector3.mul(_t, _dir) );
 	}
 	
+	public static faceforward( _v : Vector3, _right : Vector3) : Vector3
+	{
+		if (Vector3.dot(_right, _v) < 0) 
+			return _v; 
+		else 
+			return Vector3.mul(-1, _v);
+	}
+	
 	public static applyTangentFrame( _normal : Vector3, _zDir : Vector3) : Vector3
 	{ 
 		var tangent : Vector3;
@@ -492,11 +581,15 @@ class RayTracer
 		
 		if( null != hitData )
 		{
-			var objColor = hitData.hitGeometry.getMaterial().getColor();
+			var objMaterial : Material = hitData.hitGeometry.getMaterial();
+			
+			var objColor = objMaterial.getColor();
+			
+			if( objMaterial instanceof MatEmitter )
+				return objColor;
 			
 			var normal = hitData.hitGeometry.getNormal( hitData.hitWP );
-			var nextDir = MathUtils.getDiffDirLocal();
-			nextDir = MathUtils.applyTangentFrame(normal, nextDir);
+			var nextDir = objMaterial.getNextDir( _ray.dir, normal );
 
 			var nextRay = new Ray( 
 				MathUtils.getPointWC(_ray.origin, _ray.dir, _ray.maxT), 
@@ -554,7 +647,7 @@ class RayTracer
 		
 		console.log( "Scene objects: " + this.scene.geometry.length );
 
-		var maxIterations : number = 5;
+		var maxIterations : number = 15;
 		for( var iterations = 0; iterations < maxIterations; ++iterations )
 		{
 			for( var y = 0; y < this.rendererData.regionH; y++ )
@@ -676,6 +769,18 @@ class SceneParser
 				if( 'diff' == matType )
 				{
 					currentMaterial = new MatDiffuse( new Color3(elements[elID++], elements[elID++], elements[elID++]) );
+				}
+				else if( 'refl' == matType )
+				{
+					currentMaterial = new MatMirror( new Color3(elements[elID++], elements[elID++], elements[elID++]) );
+				}
+				else if( 'refr' == matType )
+				{
+					currentMaterial = new MatGlass( new Color3(elements[elID++], elements[elID++], elements[elID++]), +elements[elID++] );
+				}
+				else if( 'emit' == matType )
+				{
+					currentMaterial = new MatEmitter( new Color3(elements[elID++], elements[elID++], elements[elID++]) );
 				}
 				else
 				{

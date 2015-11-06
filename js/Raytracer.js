@@ -99,7 +99,50 @@ var MatDiffuse = (function () {
     MatDiffuse.prototype.getColor = function () {
         return this.filterColor;
     };
+    MatDiffuse.prototype.getNextDir = function (_inDir, _normal) {
+        var nextDir = MathUtils.getDiffDirLocal();
+        return MathUtils.applyTangentFrame(_normal, nextDir);
+    };
     return MatDiffuse;
+})();
+var MatMirror = (function () {
+    function MatMirror(_filterColor) {
+        this.filterColor = _filterColor;
+    }
+    MatMirror.prototype.getColor = function () {
+        return this.filterColor;
+    };
+    MatMirror.prototype.getNextDir = function (_inDir, _normal) {
+        var normalFF = MathUtils.faceforward(_normal, _inDir);
+        var outDir = Vector3.getNormalized(Vector3.minus(_inDir, Vector3.mul(Vector3.dot(normalFF, _inDir) * 2.0, normalFF)));
+        return outDir;
+    };
+    return MatMirror;
+})();
+var MatGlass = (function () {
+    function MatGlass(_filterColor, _ior) {
+        this.filterColor = _filterColor;
+        this.IoR = _ior;
+    }
+    MatGlass.prototype.getColor = function () {
+        return this.filterColor;
+    };
+    MatGlass.prototype.getNextDir = function (_inDir, _normal) {
+        var normalFF = MathUtils.faceforward(_normal, _inDir);
+        var ior = this.IoR;
+        if (Vector3.dot(_normal, _inDir) < 0)
+            ior = 1.0 / this.IoR;
+        var thetaView = Vector3.dot(_inDir, _normal);
+        var thetaT = 1.0 - (ior * ior) * (1.0 - thetaView * thetaView);
+        var outDir = new Vector3(0, 0, 0);
+        if (thetaT < 0.0) {
+            outDir = Vector3.getNormalized(Vector3.minus(_inDir, Vector3.mul(Vector3.dot(normalFF, _inDir) * 2.0, normalFF)));
+        }
+        else
+            outDir = Vector3.minus(Vector3.mul(ior, _inDir), Vector3.mul(ior * thetaView + Math.sqrt(thetaT), _normal));
+        return outDir;
+    };
+    return MatGlass;
 })();
 var MatEmitter = (function () {
     function MatEmitter(_filterColor) {
@@ -107,6 +150,10 @@ var MatEmitter = (function () {
     }
     MatEmitter.prototype.getColor = function () {
         return this.filterColor;
+    };
+    MatEmitter.prototype.getNextDir = function (_inDir, _normal) {
+        var nextDir = MathUtils.getDiffDirLocal();
+        return MathUtils.applyTangentFrame(_normal, nextDir);
     };
     return MatEmitter;
 })();
@@ -233,6 +280,12 @@ var MathUtils = (function () {
     MathUtils.getPointWC = function (_pos, _dir, _t) {
         return Vector3.plus(_pos, Vector3.mul(_t, _dir));
     };
+    MathUtils.faceforward = function (_v, _right) {
+        if (Vector3.dot(_right, _v) < 0)
+            return _v;
+        else
+            return Vector3.mul(-1, _v);
+    };
     MathUtils.applyTangentFrame = function (_normal, _zDir) {
         var tangent;
         tangent = Vector3.cross(_normal, new Vector3(0.643782, 0.98432, 0.324632));
@@ -281,10 +334,12 @@ var RayTracer = (function () {
             return radiance;
         var hitData = this.scene.intersect(_ray);
         if (null != hitData) {
-            var objColor = hitData.hitGeometry.getMaterial().getColor();
+            var objMaterial = hitData.hitGeometry.getMaterial();
+            var objColor = objMaterial.getColor();
+            if (objMaterial instanceof MatEmitter)
+                return objColor;
             var normal = hitData.hitGeometry.getNormal(hitData.hitWP);
-            var nextDir = MathUtils.getDiffDirLocal();
-            nextDir = MathUtils.applyTangentFrame(normal, nextDir);
+            var nextDir = objMaterial.getNextDir(_ray.dir, normal);
             var nextRay = new Ray(MathUtils.getPointWC(_ray.origin, _ray.dir, _ray.maxT), nextDir);
             nextRay.minT = 0.0001;
             var inRad = this.getRadiance(nextRay, ++_depth);
@@ -316,7 +371,7 @@ var RayTracer = (function () {
     };
     RayTracer.prototype.trace = function () {
         console.log("Scene objects: " + this.scene.geometry.length);
-        var maxIterations = 5;
+        var maxIterations = 15;
         for (var iterations = 0; iterations < maxIterations; ++iterations) {
             for (var y = 0; y < this.rendererData.regionH; y++) {
                 for (var x = 0; x < this.rendererData.regionW; x++) {
@@ -390,6 +445,15 @@ var SceneParser = (function () {
                 var matType = elements[elID++];
                 if ('diff' == matType) {
                     currentMaterial = new MatDiffuse(new Color3(elements[elID++], elements[elID++], elements[elID++]));
+                }
+                else if ('refl' == matType) {
+                    currentMaterial = new MatMirror(new Color3(elements[elID++], elements[elID++], elements[elID++]));
+                }
+                else if ('refr' == matType) {
+                    currentMaterial = new MatGlass(new Color3(elements[elID++], elements[elID++], elements[elID++]), +elements[elID++]);
+                }
+                else if ('emit' == matType) {
+                    currentMaterial = new MatEmitter(new Color3(elements[elID++], elements[elID++], elements[elID++]));
                 }
                 else {
                     currentMaterial = new MatDiffuse(new Color3(1, 1, 1));
